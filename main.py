@@ -4,10 +4,9 @@ import tensorflow as tf
 import numpy as np
 import glob
 import sys
-import os
 from models import *
 import yaml
-
+import os
 
 ####### Reading Hyperparameters #####
 with open("config.yaml") as file:
@@ -23,14 +22,15 @@ with open("config.yaml") as file:
 	if len(descrip)==0:
 		raise ValueError, "Please give a proper description of the model you are training."
 
+
 ######## Making Directory #########
 model_path = log_dir+sys.argv[1]
 print "Model Path: ", model_path
 if not os.path.exists(model_path):
-    os.makedirs(model_path)
-    os.makedirs(model_path+"/results")
-    os.makedirs(model_path+"/tf_graph")
-    os.makedirs(model_path+"/saved_model")
+	os.makedirs(model_path)
+	os.makedirs(model_path+"/results")
+	os.makedirs(model_path+"/tf_graph")
+	os.makedirs(model_path+"/saved_model")
 
 
 ######### Loading Data ###########
@@ -42,8 +42,8 @@ Val_img = 1/255.0*Val_img
 
 os.system('cp config.yaml '+model_path+'/config.yaml')
 
-DD = DeepDive(model_path)
-DD.build_model()
+nnet = MSCNN(model_path)
+nnet.build_model()
 print "Model Build......"
-DD.train_model(Train_img, Val_img,learning_rate, batch_size, epoch_size)
+# DD.train_model(Train_img, Val_img,learning_rate, batch_size, epoch_size)
 

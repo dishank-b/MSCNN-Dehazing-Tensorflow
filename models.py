@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import cv2
 from ops import *
-from vgg16 import *
+import os
 
 class MSCNN(object):
 	"""Single Image Dehazing via Multi-Scale Convolutional Neural Networks"""
@@ -22,20 +22,20 @@ class MSCNN(object):
 		with tf.variable_scope("coarseNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=5, kernel=[11,11], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
-			pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			upsample1 = max_unpool(pool1, 2, "upsample1")
+			# pool1 = max_pool(conv1, 2, 2, "max_pool1")
+			# upsample1 = max_unpool(pool1, "upsample1")
 			
-			conv2 = Conv_2D(upsample1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			conv2 = Conv_2D(conv1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv2")
-			pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			upsample2 = max_unpool(pool2, 2, "upsample2")
+			# pool2 = max_pool(conv2, 2, 2, "max_pool2")
+			# upsample2 = max_unpool(pool2, "upsample2")
 			
-			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			conv3 = Conv_2D(conv2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv3")
-			pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			upsample3 = max_unpool(pool3, 2, "upsample3")	
+			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
+			# upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
+			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
 							name="linear_comb")
 			return linear
 
@@ -43,29 +43,29 @@ class MSCNN(object):
 		with tf.variable_scope("fineNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=4, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
-			pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			upsample1 = max_unpool(pool1, 2, "upsample1")
+			# pool1 = max_pool(conv1, 2, 2, "max_pool1")
+			# upsample1 = max_unpool(pool1, "upsample1")
 			
-			concat = tf.concat([upsample1, coarseMap], axis=3, name="CorMapConcat")
+			concat = tf.concat([conv1, coarseMap], axis=3, name="CorMapConcat")
 
 			conv2 = Conv_2D(concat, output_chan=5, kernel=[5,5], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv2")
-			pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			upsample2 = max_unpool(pool2, 2, "upsample2")
+			# pool2 = max_pool(conv2, 2, 2, "max_pool2")
+			# upsample2 = max_unpool(pool2, "upsample2")
 			
-			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			conv3 = Conv_2D(conv2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv3")
-			pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			upsample3 = max_unpool(pool3, 2, "upsample3")	
+			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
+			# upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="linear_comb")
 			return linear
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
-			self.x = tf.placeholder(tf.float32, shape=[None,224,224,3], name="Haze_Image")
-			self.y = tf.placeholder(tf.float32, shape=[None,224,224,3], name="TMap")
+			self.x = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Haze_Image")
+			self.y = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
 
 		with tf.name_scope("Model") as scope:
@@ -102,11 +102,13 @@ class MSCNN(object):
 		self.sess.run(tf.global_variables_initializer())
 
 	def train_model(self, train_imgs, val_imgs, learning_rate=1e-5, batch_size=32, epoch_size=50):
+		
 		self.debug_info()
 		print "Training Images: ", train_imgs.shape[0]
 		print "Validation Images: ", val_imgs.shape[0]
 		print "Learning_rate: ", learning_rate, "Batch_size", batch_size, "Epochs", epoch_size
 		raw_input("Training will start above configuration. Press Enter to Start....")
+		
 		with tf.name_scope("Training") as scope:
 			for epoch in range(epoch_size):
 				for itr in xrange(0, train_imgs.shape[0]-batch_size, batch_size):

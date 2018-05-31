@@ -116,3 +116,31 @@ def max_pool(input, kernel=3, stride=2, name=None):
       output = tf.nn.max_pool(input, ksize=ksize, strides=strides,
          padding='SAME')
       return output
+
+def make_mat(in_shape):
+	a = np.zeros(shape=[in_shape[0]*2, in_shape[0]])
+	index_0 = range(2*in_shape[0])
+	index_1 = [int(i/2) for i in range(2*in_shape[0])]
+	index_0 = np.array(index_0)
+	index_1 = np.array(index_1)
+	a[index_0, index_1] = 1.0
+	return a
+
+def make_mat_trans(in_shape):
+	a = np.zeros(shape=[in_shape[0], in_shape[0]*2])
+	index_1 = range(2*in_shape[0])
+	index_0 = [int(i/2) for i in range(2*in_shape[0])]
+	index_0 = np.array(index_0)
+	index_1 = np.array(index_1)
+	a[index_0, index_1] = 1.0
+	return a
+
+def max_unpool(value, name):
+	with tf.variable_scope(name) as scope:
+		in_shape = value.get_shape().as_list()
+		assert in_shape[1]==in_shape[2]
+		a = tf.py_func(make_mat, [in_shape[1]], tf.float32)
+		b = tf.py_func(make_mat_trans, [in_shape[2]], tf.float32)
+		out = tf.matmul(a, tf.matmul(input,b))
+		print out.get_shape()
+		return out
