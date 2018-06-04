@@ -5,6 +5,8 @@ import numpy as np
 import cv2
 from ops import *
 import os
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 class MSCNN(object):
 	"""Single Image Dehazing via Multi-Scale Convolutional Neural Networks"""
@@ -17,8 +19,17 @@ class MSCNN(object):
 			os.makedirs(self.graph_path+"train/")
 			os.makedirs(self.graph_path+"val/")
 		
+	def _debug_info(self):
+		variables_names = [[v.name, v.get_shape().as_list()] for v in tf.trainable_variables()]
+		print "Trainable Variables:"
+		tot_params = 0
+		for i in variables_names:
+			var_params = np.prod(np.array(i[1]))
+			tot_params += var_params
+			print i[0], i[1], var_params
+		print "Total number of Trainable Parameters: ", str(tot_params/1000.0)+"K"
 
-	def coarseNet(self, x):
+	def _coarseNet(self, x):
 		with tf.variable_scope("coarseNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=5, kernel=[11,11], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
@@ -36,10 +47,10 @@ class MSCNN(object):
 			# upsample3 = max_unpool(pool3, "upsample3")	
 
 			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
-							name="linear_comb")
+							add_summary=True, name="linear_comb")
 			return linear
 
-	def fineNet(self, x, coarseMap):
+	def _fineNet(self, x, coarseMap):
 		with tf.variable_scope("fineNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=4, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
@@ -59,7 +70,7 @@ class MSCNN(object):
 			# upsample3 = max_unpool(pool3, "upsample3")	
 
 			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
-							name="linear_comb")
+							add_summary=True, name="linear_comb")
 			return linear
 
 	def build_model(self):
@@ -67,16 +78,17 @@ class MSCNN(object):
 			self.x = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Haze_Image")
 			self.y = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
+			hazy_summ = tf.summary.image("Hazy image", self.x)
+			map_summ = tf.summary.image("Trans Map", self.y)
 
 		with tf.name_scope("Model") as scope:
-			self.coarseMap = self.coarseNet(self.x)
-			self.transMap = self.fineNet(self.x, self.coarseMap)
+			self.coarseMap = self._coarseNet(self.x)
+			self.transMap = self._fineNet(self.x, self.coarseMap)
 
 		with tf.name_scope("Loss") as scope:
 			
 			self.coarseLoss = tf.losses.mean_squared_error(self.y, self.coarseMap)
 			self.fineLoss = tf.losses.mean_squared_error(self.y, self.transMap)
-
 			self.coarse_loss_summ = tf.summary.scalar("Coarse Loss", self.coarseLoss)
 			self.fine_loss_summ = tf.summary.scalar("Fine Loss", self.fineLoss)
 
@@ -100,67 +112,65 @@ class MSCNN(object):
 		self.val_writer.add_graph(self.sess.graph)
 		self.saver = tf.train.Saver()
 		self.sess.run(tf.global_variables_initializer())
+		self._debug_info()
 
 	def train_model(self, train_imgs, val_imgs, learning_rate=1e-5, batch_size=32, epoch_size=50):
 		
-		self.debug_info()
-		print "Training Images: ", train_imgs.shape[0]
-		print "Validation Images: ", val_imgs.shape[0]
+		print "Training Images: ", train_imgs[0].shape[0]
+		print "Validation Images: ", val_imgs[0].shape[0]
 		print "Learning_rate: ", learning_rate, "Batch_size", batch_size, "Epochs", epoch_size
 		raw_input("Training will start above configuration. Press Enter to Start....")
 		
 		with tf.name_scope("Training") as scope:
 			for epoch in range(epoch_size):
-				for itr in xrange(0, train_imgs.shape[0]-batch_size, batch_size):
-					in_images = train_imgs[itr:itr+batch_size][1]
-					out_images = train_imgs[itr:itr+batch_size][0]
+				for itr in xrange(0, train_imgs[0].shape[0]-batch_size, batch_size):
+					in_images = train_imgs[0][itr:itr+batch_size][:,0,:,:,:]
+					out_images = train_imgs[1][itr:itr+batch_size]
 
-					sess_in = [self.coarse_solver, self.loss, self.merged_summ]
-					sess_out = self.sess.run(sess_in, {self.x:in_images,self.y:out_images,self.train_phase:True})
-					self.train_writer.add_summary(sess_out[2])
+					sess_in = [self.coarse_solver, self.coarseLoss, self.merged_summ]
+					coarse_out = self.sess.run(sess_in, {self.x:in_images, self.y:out_images, self.train_phase:True})
+					self.train_writer.add_summary(coarse_out[2])
+
+					sess_in  = [self.fine_solver, self.fineLoss, self.merged_summ]
+					fine_out = self.sess.run(sess_in, {self.x:in_images, self.y:out_images, self.train_phase:True})
+					self.train_writer.add_summary(fine_out[2])
 
 					if itr%5==0:
-						print "Epoch: ", epoch, "Iteration: ", itr, "Loss: ", sess_out[1]
+						print "Epoch: ", epoch, "Iteration: ", itr, " Coarse Loss: ", coarse_out[1], "Fine Loss: ", fine_out[1], \
+								"Loss: ", coarse_out[1]+fine_out[1]
 
-				for itr in xrange(0, val_imgs.shape[0]-batch_size, batch_size):
-					in_images = val_imgs[itr:itr+batch_size][1]
-					out_images = val_imgs[itr:itr+batch_size][0]
+				for itr in xrange(0, val_imgs[0].shape[0]-batch_size, batch_size):
+					in_images = val_imgs[0][itr:itr+batch_size][:,0,:,:,:]
+					out_images = val_imgs[1][itr:itr+batch_size]
 
-					val_loss, summ = self.sess.run([self.loss, self.merged_summ], {self.x: in_images, self.y: out_images,self.train_phase:False})
+					val_loss, summ = self.sess.run([self.coarseLoss, self.merged_summ], {self.x: in_images, self.y: out_images,self.train_phase:False})
 					self.val_writer.add_summary(summ)
 
 					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", val_loss
 
 				if epoch%20==0:
-					self.saver.save(self.sess, self.save_path+"DeepDive", global_step=epoch)
+					self.saver.save(self.sess, self.save_path+"MSCNN", global_step=epoch)
 					print "Checkpoint saved"
 
-					random_img = train_imgs[np.random.randint(1, train_imgs.shape[0], 4)]
+					# random_img = train_imgs[0][np.random.randint(1, train_imgs[0].shape[0], 1)]
 
-					gen_imgs = self.sess.run([self.output], {self.x: random_img[:,1,:,:,:],self.train_phase:False})
+					# gen_imgs = self.sess.run([self.coarseMap], {self.x: random_img[:,0,:,:,:],self.train_phase:False})
+					# print gen_imgs[0][0].shape
+					# cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*gen_imgs[0][0])
 
-					for i in range(2):
-						image_grid_horizontal = 255.0*random_img[i*2][1]
-						image_grid_horizontal = np.hstack((image_grid_horizontal, 255.0*random_img[i*2][0]))
-						image_grid_horizontal = np.hstack((image_grid_horizontal, 255.0*gen_imgs[0][i*2]))
-						for j in range(1):
-							image = 255.0*random_img[i*2+1][1]
-							image_grid_horizontal = np.hstack((image_grid_horizontal, image))
-							image_grid_horizontal = np.hstack((image_grid_horizontal, 255.0*random_img[i*2+1][0]))
-							image_grid_horizontal = np.hstack((image_grid_horizontal, 255.0*gen_imgs[0][i*2+1]))
-						if i==0:
-							image_grid_vertical = image_grid_horizontal
-						else:
-							image_grid_vertical = np.vstack((image_grid_vertical, image_grid_horizontal))
+	def test(self, input_imgs):
+		sess=tf.Session()
+		
+		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
+		saver.restore(sess,tf.train.latest_checkpoint(self.save_path))
 
-					cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", image_grid_vertical)
+		graph = tf.get_default_graph()
 
-	def debug_info(self):
-		variables_names = [[v.name, v.get_shape().as_list()] for v in tf.trainable_variables()]
-		print "Trainable Variables:"
-		tot_params = 0
-		for i in variables_names:
-			var_params = np.prod(np.array(i[1]))
-			tot_params += var_params
-			print i[0], i[1], var_params
-		print "Total number of Trainable Parameters: ", str(tot_params/1000.0)+"K"
+		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
+		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
+		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
+		
+		maps = sess.run(y, {x:input_imgs, is_train:True})
+
+		return maps
+

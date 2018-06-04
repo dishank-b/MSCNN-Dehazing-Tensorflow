@@ -8,8 +8,8 @@ def Conv_2D(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activatio
 	kern = [kernel[0], kernel[1], input_shape[-1], output_chan]
 	strd = [1, stride[0], stride[1], 1]
 	with tf.variable_scope(name) as scope:
-		W = tf.get_variable(name="W", shape=kern, initializer=tf.truncated_normal_initializer(stddev=0.01))
-		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.constant_initializer(0.1))
+		W = tf.get_variable(name="W", shape=kern, initializer=tf.keras.initializers.he_normal())
+		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.keras.initializers.he_normal())
 
 		Conv2D = tf.nn.bias_add(tf.nn.conv2d(input=x, filter=W, strides=strd, padding=padding), b)
 		
@@ -24,6 +24,8 @@ def Conv_2D(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activatio
 		if add_summary==True:
 			weight_summ= tf.summary.histogram(name+"_W", W)  # Make sure you use summary.merge_all() if here you are adding the summaries
 			bias_summ= tf.summary.histogram(name+"_b", b)
+			if out.get_shape()[-1]<=3:
+				feature_summ = tf.summary.image(name+"_feat", out)
 		
 		return out
 
@@ -33,8 +35,8 @@ def Dconv_2D(x, output_chan,batch_size ,kernel=[5,5], stride=[2,2], padding="SAM
 	strd = [1, stride[0], stride[1], 1]
 	output_shape = [batch_size,input_shape[1]*strd[1],input_shape[2]*strd[2],output_chan]
 	with tf.variable_scope(name) as scope:
-		W = tf.get_variable(name="W", shape=kern, initializer=tf.truncated_normal_initializer(stddev=0.01))
-		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.constant_initializer(0.1))
+		W = tf.get_variable(name="W", shape=kern, initializer=tf.keras.initializers.he_normal())
+		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.keras.initializers.he_normal())
 
 		D_Conv2D = tf.nn.bias_add(tf.nn.conv2d_transpose(x, filter=W, output_shape=output_shape,strides=strd, padding=padding), b)
 		
@@ -59,8 +61,8 @@ def Dconv_2D(x, output_chan,batch_size ,kernel=[5,5], stride=[2,2], padding="SAM
 def Dense(x, output_dim, use_bn=True, activation=tf.nn.relu, train_phase=True,add_summary=False, name="Dense"):
 	input_dim = x.get_shape()[-1]
 	with tf.variable_scope(name) as scope:
-		W = tf.get_variable('W', shape=[input_dim, output_dim], initializer=tf.truncated_normal_initializer(stddev=0.01))
-		b = tf.get_variable('b', shape=[output_dim], initializer=tf.constant_initializer(0.1))
+		W = tf.get_variable('W', shape=[input_dim, output_dim], initializer=tf.keras.initializers.he_normal())
+		b = tf.get_variable('b', shape=[output_dim], initializer=tf.keras.initializers.he_normal())
 
 		dense = tf.nn.bias_add(tf.matmul(x, W), b)
 

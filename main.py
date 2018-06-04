@@ -7,6 +7,8 @@ import sys
 from models import *
 import yaml
 import os
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 ####### Reading Hyperparameters #####
 with open("config.yaml") as file:
@@ -19,6 +21,7 @@ with open("config.yaml") as file:
 	model_params= data['model_params']
 	descrip = model_params['descrip']
 	log_dir = model_params['log_dir']
+	mode = model_params['mode']
 	if len(descrip)==0:
 		raise ValueError, "Please give a proper description of the model you are training."
 
@@ -34,16 +37,23 @@ if not os.path.exists(model_path):
 
 
 ######### Loading Data ###########
-Train_img = np.load(data_path+"Train.npy") # First image of each pair is clear image and
-Val_img = np.load(data_path+"Val.npy")	   # second image is hazed images. 2nd image is input to the model
+train_img1 = 1/255.0*np.load(data_path+"train_haze_clear.npy") # First image of each pair is hazy image and second image is clear images
+train_img2 = 1/255.0*np.load(data_path+"train_trans.npy") 
+val_img1 = 1/255.0*np.load(data_path+"val_haze_clear.npy")
+val_img2 = 1/255.0*np.load(data_path+"val_trans.npy")	   
 print "Data Loaded"
-Train_img = 1/255.0*Train_img # Value scaled to [0,1]
-Val_img = 1/255.0*Val_img
-
-os.system('cp config.yaml '+model_path+'/config.yaml')
 
 nnet = MSCNN(model_path)
-nnet.build_model()
-print "Model Build......"
-# DD.train_model(Train_img, Val_img,learning_rate, batch_size, epoch_size)
-
+if mode=='train':
+	os.system('cp config.yaml '+model_path+'/config.yaml')
+	nnet.build_model()
+	print "Model Build......"
+	nnet.train_model([train_img1, train_img2], [val_img1, val_img2], learning_rate, batch_size, epoch_size)
+else:
+	predict = nnet.test(train_img1[:,0,:,:,:])
+	for i in range(train_img2.shape[0]):
+		pair = np.hstack((train_img2[i], predict[i]))
+		print pair.shape
+		plt.imshow(pair[:,:,0])
+		plt.show()
+		cv2.imwrite(model_path+"/results/"+str(i)+".jpg", pair)
