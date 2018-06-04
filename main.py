@@ -9,6 +9,7 @@ import yaml
 import os
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import utils
 
 ####### Reading Hyperparameters #####
 with open("config.yaml") as file:
@@ -52,8 +53,12 @@ if mode=='train':
 else:
 	predict = nnet.test(train_img1[:,0,:,:,:])
 	for i in range(train_img2.shape[0]):
+		clear_img = utils.clearImg(train_img1[i,0,:,:,:], predict[i])
 		pair = np.hstack((train_img2[i], predict[i]))
-		print pair.shape
+		pair2 = np.hstack((train_img1[i,1,:,:,:], clear_img))
 		plt.imshow(pair[:,:,0])
 		plt.show()
-		cv2.imwrite(model_path+"/results/"+str(i)+".jpg", pair)
+		plt.imshow(pair2)
+		plt.show()
+		cv2.imwrite(model_path+"/results/trans_"+str(i)+".jpg", 255.0*pair)
+		cv2.imwrite(model_path+"/results/clear_"+str(i)+".jpg", 255.0*pair2)

@@ -33,20 +33,26 @@ class MSCNN(object):
 		with tf.variable_scope("coarseNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=5, kernel=[11,11], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
-			# pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			# upsample1 = max_unpool(pool1, "upsample1")
+			pool1 = max_pool(conv1, 2, 2, "max_pool1")
+			upsample1 = max_unpool(pool1, "upsample1")
 			
-			conv2 = Conv_2D(conv1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# conv2 = Conv_2D(conv1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# 				name="Conv2")
+			conv2 = Conv_2D(upsample1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv2")
-			# pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			# upsample2 = max_unpool(pool2, "upsample2")
+			pool2 = max_pool(conv2, 2, 2, "max_pool2")
+			upsample2 = max_unpool(pool2, "upsample2")
 			
-			conv3 = Conv_2D(conv2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# conv3 = Conv_2D(conv2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# 				name="Conv3")
+			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv3")
-			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			# upsample3 = max_unpool(pool3, "upsample3")	
+			pool3 = max_pool(conv3, 2, 2, "max_pool3")
+			upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
+			# linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
+			# 				add_summary=True, name="linear_comb")
+			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
 							add_summary=True, name="linear_comb")
 			return linear
 
@@ -54,23 +60,30 @@ class MSCNN(object):
 		with tf.variable_scope("fineNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=4, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
-			# pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			# upsample1 = max_unpool(pool1, "upsample1")
 			
-			concat = tf.concat([conv1, coarseMap], axis=3, name="CorMapConcat")
+			pool1 = max_pool(conv1, 2, 2, "max_pool1")
+			upsample1 = max_unpool(pool1, "upsample1")
+			
+			concat = tf.concat([upsample1, coarseMap], axis=3, name="CorMapConcat")
 
 			conv2 = Conv_2D(concat, output_chan=5, kernel=[5,5], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv2")
-			# pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			# upsample2 = max_unpool(pool2, "upsample2")
 			
-			conv3 = Conv_2D(conv2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			pool2 = max_pool(conv2, 2, 2, "max_pool2")
+			upsample2 = max_unpool(pool2, "upsample2")
+			
+			# conv3 = Conv_2D(conv2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# 				name="Conv3")
+			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv3")
-			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			# upsample3 = max_unpool(pool3, "upsample3")	
+			pool3 = max_pool(conv3, 2, 2, "max_pool3")
+			upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			# 				add_summary=True, name="linear_comb")
+			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							add_summary=True, name="linear_comb")
+			
 			return linear
 
 	def build_model(self):
@@ -91,7 +104,6 @@ class MSCNN(object):
 			self.fineLoss = tf.losses.mean_squared_error(self.y, self.transMap)
 			self.coarse_loss_summ = tf.summary.scalar("Coarse Loss", self.coarseLoss)
 			self.fine_loss_summ = tf.summary.scalar("Fine Loss", self.fineLoss)
-
 
 		with tf.name_scope("Optimizers") as scope:
 			train_vars = tf.trainable_variables()
