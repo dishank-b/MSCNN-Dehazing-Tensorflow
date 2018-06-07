@@ -75,8 +75,8 @@ class MSCNN(object):
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
-			self.x = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Haze_Image")
-			self.y = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
+			self.x = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Haze_Image")
+			self.y = tf.placeholder(tf.float32, shape=[None,216,240,1], name="TMap")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
 			hazy_summ = tf.summary.image("Hazy image", self.x)
 			map_summ = tf.summary.image("Trans Map", self.y)
@@ -98,8 +98,10 @@ class MSCNN(object):
 			self.coarse_vars = [var for var in train_vars if "coarse" in var.name]
 			self.fine_vars = [var for var in train_vars if "fine" in var.name]
 
-			self.coarse_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.coarseLoss, var_list=self.coarse_vars)
-			self.fine_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.fineLoss, var_list=self.fine_vars)
+			update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+  			with tf.control_dependencies(update_ops):
+				self.coarse_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.coarseLoss, var_list=self.coarse_vars)
+				self.fine_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.fineLoss, var_list=self.fine_vars)
 		
 
 		self.merged_summ = tf.summary.merge_all()
@@ -143,10 +145,10 @@ class MSCNN(object):
 					in_images = val_imgs[0][itr:itr+batch_size][:,0,:,:,:]
 					out_images = val_imgs[1][itr:itr+batch_size]
 
-					val_loss, summ = self.sess.run([self.coarseLoss, self.merged_summ], {self.x: in_images, self.y: out_images,self.train_phase:False})
+					c_val_loss,f_val_loss ,summ = self.sess.run([self.coarseLoss,self.fineLoss ,self.merged_summ], {self.x: in_images, self.y: out_images,self.train_phase:False})
 					self.val_writer.add_summary(summ)
 
-					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", val_loss
+					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", c_val_loss+f_val_loss
 
 				if epoch%20==0:
 					self.saver.save(self.sess, self.save_path+"MSCNN", global_step=epoch)
@@ -170,7 +172,7 @@ class MSCNN(object):
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
 		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
 		
-		maps = sess.run(y, {x:input_imgs, is_train:True})
+		maps = sess.run(y, {x:input_imgs, is_train:False})
 
 		return maps
 

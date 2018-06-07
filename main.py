@@ -46,14 +46,19 @@ print "Data Loaded"
 nnet = MSCNN(model_path)
 if mode=='train':
 	os.system('cp config.yaml '+model_path+'/config.yaml')
+	os.system('cp models.py '+model_path+'/model.py')
 	nnet.build_model()
 	print "Model Build......"
 	nnet.train_model([train_img1, train_img2], [val_img1, val_img2], learning_rate, batch_size, epoch_size)
 else:
 	predict = nnet.test(train_img1[:,0,:,:,:])
 	for i in range(train_img2.shape[0]):
+		clear_img = utils.clearImg(train_img1[i,0,:,:,:], predict[i])
 		pair = np.hstack((train_img2[i], predict[i]))
-		print pair.shape
-		plt.imshow(pair[:,:,0])
-		plt.show()
-		cv2.imwrite(model_path+"/results/"+str(i)+".jpg", pair)
+		pair2 = np.hstack((train_img1[i,0,:,:,:],train_img1[i,1,:,:,:], clear_img))
+		# plt.imshow(pair[:,:,0])
+		# plt.show()
+		# plt.imshow(pair2)
+		# plt.show()
+		cv2.imwrite(model_path+"/results/"+str(i)+"_trans.jpg", 255.0*pair)
+		cv2.imwrite(model_path+"/results/"+str(i)+"_clear.jpg", 255.0*pair2)
