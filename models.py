@@ -7,6 +7,7 @@ from ops import *
 import os
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import utils
 
 class MSCNN(object):
 	"""Single Image Dehazing via Multi-Scale Convolutional Neural Networks"""
@@ -160,7 +161,7 @@ class MSCNN(object):
 					# print gen_imgs[0][0].shape
 					# cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*gen_imgs[0][0])
 
-	def test(self, input_imgs):
+	def test(self, input_imgs, batch_size):
 		sess=tf.Session()
 		
 		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
@@ -172,7 +173,26 @@ class MSCNN(object):
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
 		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
 		
-		maps = sess.run(y, {x:input_imgs, is_train:False})
+		for itr in xrange(0, input_imgs.shape[0], batch_size):
+			if itr+batch_size<=input_imgs.shape[0]:
+				end = itr+batch_size
+			else:
+				end = input_imgs.shape[0]
+			input_img = input_imgs[itr:end]
+			maps = sess.run(y, {x:input_img, is_train:False})
+			if itr==0:
+				tot_out = maps
+			else:
+				tot_out = np.concatenate((tot_out, maps))
+		print "Output Shape: ", tot_out.shape
+		return tot_out
 
-		return maps
-
+		# input_img = cv2.imread("/media/mnt/dehaze/data/resize_some.jpg")
+		# print input_img.shape
+		# in_img = input_img.reshape((1, input_img.shape[0],input_img.shape[1],input_img.shape[2]))
+		# maps = sess.run(y, {x:in_img/255.0, is_train:False})
+	
+		# cv2.imwrite("/media/mnt/dehaze/data/out.jpg", maps[0]*255.0)
+		# clear_img = utils.clearImg(input_img/255.0, maps[0])
+		# print clear_img.shape
+		# cv2.imwrite("/media/mnt/dehaze/data/clear.jpg", clear_img*255.0)
