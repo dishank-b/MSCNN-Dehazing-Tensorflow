@@ -70,7 +70,7 @@ class MSCNN(object):
 			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
 			# upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid,train_phase=self.train_phase, 
 							add_summary=True, name="linear_comb")
 			return linear
 
@@ -127,15 +127,15 @@ class MSCNN(object):
 		with tf.name_scope("Training") as scope:
 			for epoch in range(epoch_size):
 				for itr in xrange(0, train_imgs[0].shape[0]-batch_size, batch_size):
-					in_images = train_imgs[0][itr:itr+batch_size][:,0,:,:,:]
-					out_images = train_imgs[1][itr:itr+batch_size]
+					in_haze = train_imgs[0][itr:itr+batch_size][:,0,:,:,:]
+					in_trans = train_imgs[1][itr:itr+batch_size]
 
 					sess_in = [self.coarse_solver, self.coarseLoss, self.merged_summ]
-					coarse_out = self.sess.run(sess_in, {self.x:in_images, self.y:out_images, self.train_phase:True})
+					coarse_out = self.sess.run(sess_in, {self.x:in_haze, self.y:in_trans, self.train_phase:True})
 					self.train_writer.add_summary(coarse_out[2])
 
 					sess_in  = [self.fine_solver, self.fineLoss, self.merged_summ]
-					fine_out = self.sess.run(sess_in, {self.x:in_images, self.y:out_images, self.train_phase:True})
+					fine_out = self.sess.run(sess_in, {self.x:in_haze, self.y:in_trans, self.train_phase:True})
 					self.train_writer.add_summary(fine_out[2])
 
 					if itr%5==0:
@@ -143,10 +143,10 @@ class MSCNN(object):
 								"Loss: ", coarse_out[1]+fine_out[1]
 
 				for itr in xrange(0, val_imgs[0].shape[0]-batch_size, batch_size):
-					in_images = val_imgs[0][itr:itr+batch_size][:,0,:,:,:]
-					out_images = val_imgs[1][itr:itr+batch_size]
+					in_haze = val_imgs[0][itr:itr+batch_size][:,0,:,:,:]
+					in_trans = val_imgs[1][itr:itr+batch_size]
 
-					c_val_loss,f_val_loss ,summ = self.sess.run([self.coarseLoss,self.fineLoss ,self.merged_summ], {self.x: in_images, self.y: out_images,self.train_phase:False})
+					c_val_loss,f_val_loss ,summ = self.sess.run([self.coarseLoss,self.fineLoss ,self.merged_summ], {self.x: in_haze, self.y: in_trans,self.train_phase:False})
 					self.val_writer.add_summary(summ)
 
 					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", c_val_loss+f_val_loss

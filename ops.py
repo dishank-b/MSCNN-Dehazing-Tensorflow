@@ -89,60 +89,25 @@ def Bn(x, is_train=True):
 	return tf.contrib.layers.batch_norm(x, decay= 0.99, is_training=is_train, center= True, scale=True, reuse=False)
 
 def L_Relu(x, alpha=0.1):
-	return tf.maximum(x, alpha*x)
+	with tf.variable_scope("Leaky_ReLU") as scope:
+		return tf.maximum(x, alpha*x)
 
 def BReLU(x, tmin=0.0, tmax=1.0):
-	return tf.minimum(tmax, tf.maximum(tmin, x))
+	with tf.variable_scope("BReLU") as scope:
+		return tf.minimum(tmax, tf.maximum(tmin, x))
 
 def L_BReLU(x, tmin=0.0, tmax=1.0, alpha=0.1):
-	return tf.maximum(alpha*x, tf.minimum(x, tmax+alpha*(x-1)))
+	with tf.variable_scope("Leaky_BReLU") as scope:
+		return tf.maximum(alpha*x, tf.minimum(x, tmax+alpha*(x-1)))
 
 def max_pool(input, kernel=3, stride=2, name=None):
-   """Max-pool
-
-   Args:
-      input : Input Tensor
-      kernel: filter's width (= filter's height)
-      stride: stride of the filter
-      name  : Optional name for the operation
-
-   Returns:
-      Tensor after max-pool operation
-   """
    if name is None: 
       name='max_pool'
 
-   with tf.variable_scope(name):
+   with tf.variable_scope(name) as scope:
       ksize = [1, kernel, kernel, 1]
       strides = [1, stride, stride, 1]
       output = tf.nn.max_pool(input, ksize=ksize, strides=strides,
          padding='SAME')
       return output
 
-def make_mat(in_shape):
-	a = np.zeros(shape=[in_shape[0]*2, in_shape[0]])
-	index_0 = range(2*in_shape[0])
-	index_1 = [int(i/2) for i in range(2*in_shape[0])]
-	index_0 = np.array(index_0)
-	index_1 = np.array(index_1)
-	a[index_0, index_1] = 1.0
-	return a
-
-def make_mat_trans(in_shape):
-	a = np.zeros(shape=[in_shape[0], in_shape[0]*2])
-	index_1 = range(2*in_shape[0])
-	index_0 = [int(i/2) for i in range(2*in_shape[0])]
-	index_0 = np.array(index_0)
-	index_1 = np.array(index_1)
-	a[index_0, index_1] = 1.0
-	return a
-
-def max_unpool(value, name):
-	with tf.variable_scope(name) as scope:
-		in_shape = value.get_shape().as_list()
-		assert in_shape[1]==in_shape[2]
-		a = tf.py_func(make_mat, [in_shape[1]], tf.float32)
-		b = tf.py_func(make_mat_trans, [in_shape[2]], tf.float32)
-		out = tf.matmul(a, tf.matmul(input,b))
-		print out.get_shape()
-		return out
