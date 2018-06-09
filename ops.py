@@ -98,17 +98,7 @@ def L_BReLU(x, tmin=0.0, tmax=1.0, alpha=0.1):
 	return tf.maximum(alpha*x, tf.minimum(x, tmax+alpha*(x-1)))
 
 def max_pool(input, kernel=3, stride=2, name=None):
-   """Max-pool
 
-   Args:
-      input : Input Tensor
-      kernel: filter's width (= filter's height)
-      stride: stride of the filter
-      name  : Optional name for the operation
-
-   Returns:
-      Tensor after max-pool operation
-   """
    if name is None: 
       name='max_pool'
 
@@ -118,35 +108,6 @@ def max_pool(input, kernel=3, stride=2, name=None):
       output = tf.nn.max_pool(input, ksize=ksize, strides=strides,
          padding='SAME')
       return output
-
-# def make_mat(in_shape):
-# 	a = np.zeros(shape=(in_shape[0]*2, in_shape[0]))
-# 	index_0 = range(2*in_shape[0])
-# 	index_1 = [int(i/2) for i in range(2*in_shape[0])]
-# 	index_0 = np.array(index_0)
-# 	index_1 = np.array(index_1)
-# 	a[index_0, index_1] = 1.0
-# 	return a
-
-# def make_mat_trans(in_shape):
-# 	a = np.zeros(shape=(in_shape[0], in_shape[0]*2))
-# 	index_1 = range(2*in_shape[0])
-# 	index_0 = [int(i/2) for i in range(2*in_shape[0])]
-# 	index_0 = np.array(index_0)
-# 	index_1 = np.array(index_1)
-# 	a[index_0, index_1] = 1.0
-# 	return a
-
-# def max_unpool(value, name):
-# 	with tf.variable_scope(name) as scope:
-# 		in_shape = value.get_shape().as_list()
-# 		assert in_shape[1]==in_shape[2]
-# 		a = tf.py_func(make_mat, [in_shape[1]], tf.float32)
-# 		b = tf.py_func(make_mat_trans, [in_shape[2]], tf.float32)
-# 		print a.get_shape(), b.get_shape()
-# 		out = tf.matmul(a, tf.matmul(input,b))
-# 		print out.get_shape()
-# 		return out
 
 def max_unpool(value, name):
 	with tf.variable_scope(name) as scope:
