@@ -7,7 +7,7 @@ from ops import *
 import os
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-import utils
+from utils import *
 
 class MSCNN(object):
 	"""Single Image Dehazing via Multi-Scale Convolutional Neural Networks"""
@@ -70,37 +70,9 @@ class MSCNN(object):
 			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
 			# upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
 							add_summary=True, name="linear_comb")
 			return linear
-
-	def _getClearImage(self, hzimg, transMap):
-
-		def _getAirlight(hzimg,transMap):
-			kernel = tf.ones((15,15, hzimg.get_shape()[-1]))
-			img = tf.nn.erosion2d(hzimg, kernel, strides=[1,1,1,1], rates=[1,1,1,1],padding="SAME")
-			img = tf.reshape(img, shape=(-1, np.prod(img.get_shape()[1:])))
-			scalar = tf.reduce_max(img, axis=1)
-			# airlight = tf.ones_like(hzimg)*scalar
-			scalar = tf.reshape(scalar, shape=(-1, 1))
-			cons = tf.ones((1, np.prod(hzimg.get_shape().as_list()[1:])))
-			airlight = scalar*cons
-			airlight = tf.reshape(airlight, shape=(-1, 240, 240,3))
-			return airlight
-
-		with tf.variable_scope("Clear_Image") as scope:
-			airlight = _getAirlight(hzimg, transMap)
-			constant_matrix = tf.ones_like(transMap)*0.1
-			hz_blue, hz_green, hz_red = tf.split(axis=3, num_or_size_splits=3, value=hzimg)
-			air_blue, air_green, air_red = tf.split(axis=3, num_or_size_splits=3, value=airlight)
-			clr_blue = (hz_blue-air_blue)/tf.maximum(constant_matrix, transMap) + air_blue
-			clr_green = (hz_green-air_green)/tf.maximum(constant_matrix, transMap) + air_green
-			clr_red = (hz_red-air_red)/tf.maximum(constant_matrix, transMap) + air_red
-			clearImg = tf.concat(axis=3, values=[clr_blue, clr_green, clr_red])
-			# clearImg[clearImg<0.5]=0.5  # There variable can be tuned to get better clear image
-			# clearImg[clearImg>0.95]=0.95	
-			image_summ = tf.summary.image("Clear_Image", clearImg)
-			return clearImg
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
@@ -108,14 +80,16 @@ class MSCNN(object):
 			self.clear_in = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Clear_Image")
 			self.trans_in = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
-			hazy_summ = tf.summary.image("Hazy image", self.haze_in)
-			map_summ = tf.summary.image("Trans Map", self.trans_in)
+			hazy_summ = tf.summary.image("Hazy_image", self.haze_in)
+			map_summ = tf.summary.image("Trans_Map", self.trans_in)
+			clear_summ = tf.summary.image("clear_in", self.clear_in)
 
 		with tf.name_scope("Model") as scope:
 			self.coarseMap = self._coarseNet(self.haze_in)
 			self.transMap = self._fineNet(self.haze_in, self.coarseMap)
-			self.clearImg = self._getClearImage(self.haze_in, self.transMap)
-			# self.clearImg = self._getClearImage(self.haze_in, self.coarseMap)
+			self.clearImg = getClearImage(self.haze_in, self.transMap)
+			# self.clearImg = getClearImage(self.haze_in, self.trans_in)
+			clear_image_summ = tf.summary.image("Out_Clear", self.clearImg)
 
 		with tf.name_scope("Loss") as scope:
 			self.coarseLoss = tf.losses.mean_squared_error(self.clear_in, self.clearImg)\
@@ -166,7 +140,7 @@ class MSCNN(object):
 					sess_in = [self.coarse_solver, self.coarseLoss, self.merged_summ]
 					coarse_out = self.sess.run(sess_in, {self.haze_in:haze_in, self.trans_in:trans_in, self.clear_in: clear_in,self.train_phase:True})
 					self.train_writer.add_summary(coarse_out[2])
-
+					
 					sess_in  = [self.fine_solver, self.fineLoss, self.merged_summ]
 					fine_out = self.sess.run(sess_in, {self.haze_in:haze_in, self.trans_in:trans_in, self.clear_in: clear_in,self.train_phase:True})
 					self.train_writer.add_summary(fine_out[2])
@@ -174,6 +148,15 @@ class MSCNN(object):
 					if itr%5==0:
 						print "Epoch: ", epoch, "Iteration: ", itr, " Coarse Loss: ", coarse_out[1], "Fine Loss: ", fine_out[1], \
 								"Loss: ", coarse_out[1]+fine_out[1]
+
+						# for i in range(2):
+						# 	plt.imshow(clear_in[i])
+						# 	plt.show()
+						# 	coarse_out[3][i][coarse_out[3][i]>1.0]=1.0
+						# 	coarse_out[3][i][coarse_out[3][i]<0.0]=0.0
+						# 	plt.imshow(coarse_out[3][i])
+						# 	plt.show()
+
 
 				for itr in xrange(0, val_imgs[0].shape[0]-batch_size, batch_size):
 					haze_in = val_imgs[0][itr:itr+batch_size][:,0,:,:,:]
@@ -188,15 +171,18 @@ class MSCNN(object):
 
 					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", c_val_loss+f_val_loss
 
-				if epoch%20==0:
+				if epoch%5==0:
 					self.saver.save(self.sess, self.save_path+"MSCNN", global_step=epoch)
 					print "Checkpoint saved"
 
-					# random_img = train_imgs[0][np.random.randint(1, train_imgs[0].shape[0], 1)]
+					a = np.random.randint(1, train_imgs[0].shape[0], 1)
+					
+					random_img = train_imgs[0][a]
 
-					# gen_imgs = self.sess.run([self.coarseMap], {self.haze_in: random_img[:,0,:,:,:],self.train_phase:False})
-					# print gen_imgs[0][0].shape
-					# cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*gen_imgs[0][0])
+					gen_imgs = self.sess.run(self.clearImg, {self.haze_in: random_img[:,0,:,:,:], self.trans_in: train_imgs[1][a], self.train_phase:False})
+					for i,j,k in zip(random_img[:,0,:,:,:], random_img[:,1,:,:,:], gen_imgs):
+						stack = np.hstack((i,j,k))
+						cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*stack)
 
 	def test(self, input_imgs, batch_size):
 		sess=tf.Session()
