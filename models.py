@@ -171,7 +171,7 @@ class MSCNN(object):
 
 					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", c_val_loss+f_val_loss
 
-				if epoch%5==0:
+				if epoch%20==0:
 					self.saver.save(self.sess, self.save_path+"MSCNN", global_step=epoch)
 					print "Checkpoint saved"
 
@@ -187,14 +187,16 @@ class MSCNN(object):
 	def test(self, input_imgs, batch_size):
 		sess=tf.Session()
 		
-		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
+		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-80.meta')
 		saver.restore(sess,tf.train.latest_checkpoint(self.save_path))
 
 		graph = tf.get_default_graph()
 
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
-		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
+		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
+		clr_img = graph.get_tensor_by_name("Model/clearImage/clip_by_value:0")
+
 		
 		for itr in xrange(0, input_imgs.shape[0], batch_size):
 			if itr+batch_size<=input_imgs.shape[0]:
@@ -202,13 +204,15 @@ class MSCNN(object):
 			else:
 				end = input_imgs.shape[0]
 			input_img = input_imgs[itr:end]
-			maps = sess.run(y, {x:input_img, is_train:False})
+			out = sess.run([y, clr_img], {x:input_img, is_train:False})
 			if itr==0:
-				tot_out = maps
+				tot_maps = out[0]
+				tot_clr = out[1]
 			else:
-				tot_out = np.concatenate((tot_out, maps))
-		print "Output Shape: ", tot_out.shape
-		return tot_out
+				tot_maps = np.concatenate((tot_maps, out[0]))
+				tot_clr = np.concatenate((tot_clr, out[1]))
+		print "Output Shape: ", tot_maps.shape, tot_clr.shape
+		return tot_maps, tot_clr
 
 		# input_img = cv2.imread("/media/mnt/dehaze/data/resize_some.jpg")
 		# print input_img.shape

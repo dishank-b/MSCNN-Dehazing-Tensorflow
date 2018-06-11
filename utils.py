@@ -154,6 +154,8 @@ def getClearImage(hzimg, transMap):
 		clr_green = (hz_green-air_green)/tf.maximum(constant_matrix, transMap) + air_green
 		clr_red = (hz_red-air_red)/tf.maximum(constant_matrix, transMap) + air_red
 		clearImage = tf.concat(axis=3, values=[clr_blue, clr_green, clr_red])
+
+		clearImage = tf.clip_by_value(clearImage, 0.0, 1.0)
 		
 		return clearImage
 
