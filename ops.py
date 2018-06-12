@@ -29,10 +29,11 @@ def Conv_2D(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activatio
 		
 		return out
 
-def Dconv_2D(x, output_chan,batch_size ,kernel=[5,5], stride=[2,2], padding="SAME",activation=tf.nn.relu, use_bn=False, train_phase=True,add_summary=False, name="D_conv2D"):
+def Dconv_2D(x, output_chan, kernel=[5,5], stride=[2,2], padding="SAME",activation=tf.nn.relu, use_bn=False, train_phase=True,add_summary=False, name="D_conv2D"):
 	input_shape = x.get_shape().as_list()
 	kern = [kernel[0], kernel[1], output_chan, input_shape[-1]]
 	strd = [1, stride[0], stride[1], 1]
+	batch_size = tf.shape(x)[0]
 	output_shape = [batch_size,input_shape[1]*strd[1],input_shape[2]*strd[2],output_chan]
 	with tf.variable_scope(name) as scope:
 		W = tf.get_variable(name="W", shape=kern, initializer=tf.keras.initializers.he_normal())
@@ -42,21 +43,19 @@ def Dconv_2D(x, output_chan,batch_size ,kernel=[5,5], stride=[2,2], padding="SAM
 		
 		if use_bn==True:
 			D_Conv2D = Bn(D_Conv2D, is_train=train_phase)
-			assert activation!=None
+			
+		if activation!=None:
 			out = activation(D_Conv2D)	
-
 		else:
-			if activation!=None:
-				out= activation(D_Conv2D)
-			else:
-				out= D_Conv2D
+			out= D_Conv2D
 
 		if add_summary==True:
 			weight_summ= tf.summary.histogram(name+"_W", W)
 			bias_summ= tf.summary.histogram(name+"_b", b)
-			return out, [weight_summ, bias_summ]
-		else:
-			return out
+			if out.get_shape()[-1]<=3:
+				feature_summ = tf.summary.image(name+"_feat", out)
+
+		return out
 
 def Dense(x, output_dim, use_bn=True, activation=tf.nn.relu, train_phase=True,add_summary=False, name="Dense"):
 	input_dim = x.get_shape()[-1]
@@ -68,18 +67,17 @@ def Dense(x, output_dim, use_bn=True, activation=tf.nn.relu, train_phase=True,ad
 
 		if use_bn==True:
 			dense = Bn(dense, is_train=train_phase)
-			assert activation!=None
+			
+		if activation!=None:
 			out = activation(dense)
 		else:
-			if activation!=None:
-				out= activation(dense)
-			else:
-				out = dense
+			out = dense
 
 		if add_summary==True:
-			return out, [weight_summ, bias_summ]
-		else:
-			return out
+			weight_summ= tf.summary.histogram(name+"_W", W)
+			bias_summ= tf.summary.histogram(name+"_b", b)
+		
+		return out
 
 def Bn(x, is_train=True):
 	"""

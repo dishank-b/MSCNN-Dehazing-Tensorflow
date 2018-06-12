@@ -33,15 +33,18 @@ class MSCNN(object):
 		with tf.variable_scope("coarseNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=5, kernel=[11,11], stride=[1,1], padding="SAME", name="Conv1")
 			pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			upsample1 = max_unpool(pool1, "upsample1")
+			# upsample1 = max_unpool(pool1, "upsample1")
+			upsample1 = Dconv_2D(pool1, output_chan=5, kernel=[5,5], stride=[2,2], padding="SAME", name="D_Conv1")
 
 			conv2 = Conv_2D(upsample1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", name="Conv2")
 			pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			upsample2 = max_unpool(pool2, "upsample2")
+			# upsample2 = max_unpool(pool2, "upsample2")
+			upsample2 = Dconv_2D(pool2, output_chan=5, kernel=[5,5], stride=[2,2], padding="SAME", name="D_Conv2")
 	
 			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", name="Conv3")
 			pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			upsample3 = max_unpool(pool3, "upsample3")	
+			# upsample3 = max_unpool(pool3, "upsample3")	
+			upsample3 = Dconv_2D(pool3, output_chan=10, kernel=[5,5], stride=[2,2], padding="SAME", name="D_Conv3")	
 
 			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, 
 							add_summary=True, name="linear_comb")
@@ -51,17 +54,20 @@ class MSCNN(object):
 		with tf.variable_scope("fineNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=4, kernel=[7,7], stride=[1,1], padding="SAME", name="Conv1")
 			pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			upsample1 = max_unpool(pool1, "upsample1")
+			# upsample1 = max_unpool(pool1, "upsample1")
+			upsample1 = Dconv_2D(pool1, output_chan=4, kernel=[5,5], stride=[2,2], padding="SAME", name="D_Conv1")
 			
 			concat = tf.concat([upsample1, coarseMap], axis=3, name="CorMapConcat")
 
 			conv2 = Conv_2D(concat, output_chan=5, kernel=[5,5], stride=[1,1], padding="SAME", name="Conv2")
 			pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			upsample2 = max_unpool(pool2, "upsample2")
+			# upsample2 = max_unpool(pool2, "upsample2")
+			upsample2 = Dconv_2D(pool2, output_chan=5, kernel=[5,5], stride=[2,2], padding="SAME", name="D_Conv2")
 	
 			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", name="Conv3")
 			pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			upsample3 = max_unpool(pool3, "upsample3")	
+			# upsample3 = max_unpool(pool3, "upsample3")	
+			upsample3 = Dconv_2D(pool3, output_chan=10, kernel=[5,5], stride=[2,2], padding="SAME", name="D_Conv3")	
 
 			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid,
 							add_summary=True, name="linear_comb")
@@ -70,8 +76,8 @@ class MSCNN(object):
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
-			self.x = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Haze_Image")
-			self.y = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
+			self.x = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Haze_Image")
+			self.y = tf.placeholder(tf.float32, shape=[None,216,240,1], name="TMap")
 			hazy_summ = tf.summary.image("Hazy image", self.x)
 			map_summ = tf.summary.image("Trans Map", self.y)
 
@@ -151,7 +157,7 @@ class MSCNN(object):
 					# print gen_imgs[0][0].shape
 					# cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*gen_imgs[0][0])
 
-	def test(self, input_imgs):
+	def test(self, input_imgs, batch_size):
 		sess=tf.Session()
 		
 		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
@@ -162,8 +168,17 @@ class MSCNN(object):
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
 		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
 		
-		print "start"
-		maps = sess.run(y, {x:input_imgs})
-		print "Done."
-		return maps
+		for itr in xrange(0, input_imgs.shape[0], batch_size):
+			if itr+batch_size<=input_imgs.shape[0]:
+				end = itr+batch_size
+			else:
+				end = input_imgs.shape[0]
+			input_img = input_imgs[itr:end]
+			maps = sess.run(y, {x:input_img})
+			if itr==0:
+				tot_out = maps
+			else:
+				tot_out = np.concatenate((tot_out, maps))
+		print "Output Shape: ", tot_out.shape
+		return tot_out
 
