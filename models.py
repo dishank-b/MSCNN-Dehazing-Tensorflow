@@ -169,6 +169,7 @@ class MSCNN(object):
 		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
 		
 		for itr in xrange(0, input_imgs.shape[0], batch_size):
+			print "Iteration:", itr
 			if itr+batch_size<=input_imgs.shape[0]:
 				end = itr+batch_size
 			else:

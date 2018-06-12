@@ -112,9 +112,10 @@ def clearImg(hzimg, transMap):
 	clearImg = np.zeros(hzimg.shape)
 	transMap = transMap.reshape((transMap.shape[0], transMap.shape[1]))
 	constant_matrix = np.ones_like(transMap)*0.1
-	clearImg[:,:,0] = (hzimg[:,:,0]-airlight[:,:,0])/np.maximum(constant_matrix, transMap) + airlight[:,:,0]
-	clearImg[:,:,1] = (hzimg[:,:,1]-airlight[:,:,1])/np.maximum(constant_matrix, transMap) + airlight[:,:,1]
-	clearImg[:,:,2] = (hzimg[:,:,2]-airlight[:,:,2])/np.maximum(constant_matrix, transMap) + airlight[:,:,2]
+	div_mat = np.maximum(constant_matrix, transMap)
+	clearImg[:,:,0] = (hzimg[:,:,0]-airlight[:,:,0])/div_mat + airlight[:,:,0]
+	clearImg[:,:,1] = (hzimg[:,:,1]-airlight[:,:,1])/div_mat + airlight[:,:,1]
+	clearImg[:,:,2] = (hzimg[:,:,2]-airlight[:,:,2])/div_mat + airlight[:,:,2]
 	clearImg[clearImg<0.0]=0.0
 	clearImg[clearImg>1.0]=1.0	
 	return clearImg
