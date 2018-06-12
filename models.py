@@ -160,11 +160,10 @@ class MSCNN(object):
 		graph = tf.get_default_graph()
 
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
-		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
-		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
+		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
 		
 		print "start"
-		maps = sess.run(y, {x:input_imgs, is_train:True})
+		maps = sess.run(y, {x:input_imgs})
 		print "Done."
 		return maps
 
