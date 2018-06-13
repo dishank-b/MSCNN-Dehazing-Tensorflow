@@ -132,21 +132,22 @@ def getClearImage(hzimg, transMap):
 		scalar = tf.reshape(scalar, shape=(-1, 1))
 		cons = tf.ones((1, np.prod(hz_blue.get_shape().as_list()[1:])))
 		air_blue = scalar*cons
-		air_blue = tf.reshape(air_blue, shape=(-1, 240,240,1))
+		air_blue = tf.reshape(air_blue, shape=(-1, hz_blue.get_shape()[1],hz_blue.get_shape()[2],hz_blue.get_shape()[3]))
 
 		img_green = tf.nn.erosion2d(hz_green, kernel, strides=[1,1,1,1], rates=[1,1,1,1],padding="SAME")
 		img_reshape = tf.reshape(img_green, shape=(-1, np.prod(img_green.get_shape()[1:])))
 		scalar = tf.reduce_max(img_reshape, axis=1)
 		scalar = tf.reshape(scalar, shape=(-1, 1))
 		air_green = scalar*cons
-		air_green = tf.reshape(air_green, shape=(-1, 240,240,1))
+		air_green = tf.reshape(air_green, shape=(-1, hz_blue.get_shape()[1],hz_blue.get_shape()[2],hz_blue.get_shape()[3]))
 
 		img_red = tf.nn.erosion2d(hz_red, kernel, strides=[1,1,1,1], rates=[1,1,1,1],padding="SAME")
 		img_reshape = tf.reshape(img_red, shape=(-1, np.prod(img_red.get_shape()[1:])))
 		scalar = tf.reduce_max(img_reshape, axis=1)
 		scalar = tf.reshape(scalar, shape=(-1, 1))
 		air_red = scalar*cons
-		air_red = tf.reshape(air_red, shape=(-1, 240,240,1))
+		air_red = tf.reshape(air_red, shape=(-1, hz_blue.get_shape()[1],hz_blue.get_shape()[2],hz_blue.get_shape()[3]))
+		
 		airlight = tf.concat(axis=3, values=[air_blue, air_green, air_red])
 
 		constant_matrix = tf.ones_like(transMap)*0.1

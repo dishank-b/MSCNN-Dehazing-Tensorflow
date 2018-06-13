@@ -1,11 +1,12 @@
 model_params:  
-  descrip: "Building Graph"
+  descrip: "End To End Training. With Pooling and no batch norm.Cityscape"
   model_name: "MSCNN" # DD or MSCNN
-  mode: "test"   # train or test
+  mode: "train"   # train or test
   log_dir: /media/mnt/dehaze/logs/ # path to write the model and load the model
 
 training_params:
   learning_rate: 1e-04
   epochs: 250
   batch_size: 32
-  data_path: /media/mnt/dehaze/data/ChinaMM18dehaze/  # Path from where to load the data
+  data_path: /media/mnt/dehaze/data/cityscape/processed/  # Path from where to load the data
+  # data_path: /media/mnt/dehaze/data/ChinaMM18dehaze/  # Path from where to load the data

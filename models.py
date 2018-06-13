@@ -34,20 +34,20 @@ class MSCNN(object):
 		with tf.variable_scope("coarseNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=5, kernel=[11,11], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
-			# pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			# upsample1 = max_unpool(pool1, "upsample1")
+			pool1 = max_pool(conv1, 2, 2, "max_pool1")
+			upsample1 = max_unpool(pool1, "upsample1")
 			
-			conv2 = Conv_2D(conv1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			conv2 = Conv_2D(upsample1, output_chan=5, kernel=[9,9], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv2")
-			# pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			# upsample2 = max_unpool(pool2, "upsample2")
+			pool2 = max_pool(conv2, 2, 2, "max_pool2")
+			upsample2 = max_unpool(pool2, "upsample2")
 			
-			conv3 = Conv_2D(conv2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv3")
-			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			# upsample3 = max_unpool(pool3, "upsample3")	
+			pool3 = max_pool(conv3, 2, 2, "max_pool3")
+			upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
+			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
 							add_summary=True, name="linear_comb")
 			return linear
 
@@ -55,30 +55,30 @@ class MSCNN(object):
 		with tf.variable_scope("fineNet") as var_scope:
 			conv1 = Conv_2D(x, output_chan=4, kernel=[7,7], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv1")
-			# pool1 = max_pool(conv1, 2, 2, "max_pool1")
-			# upsample1 = max_unpool(pool1, "upsample1")
+			pool1 = max_pool(conv1, 2, 2, "max_pool1")
+			upsample1 = max_unpool(pool1, "upsample1")
 			
-			concat = tf.concat([conv1, coarseMap], axis=3, name="CorMapConcat")
+			concat = tf.concat([upsample1, coarseMap], axis=3, name="CorMapConcat")
 
 			conv2 = Conv_2D(concat, output_chan=5, kernel=[5,5], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv2")
-			# pool2 = max_pool(conv2, 2, 2, "max_pool2")
-			# upsample2 = max_unpool(pool2, "upsample2")
+			pool2 = max_pool(conv2, 2, 2, "max_pool2")
+			upsample2 = max_unpool(pool2, "upsample2")
 			
-			conv3 = Conv_2D(conv2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
+			conv3 = Conv_2D(upsample2, output_chan=10, kernel=[3,3], stride=[1,1], padding="SAME", train_phase=self.train_phase, 
 							name="Conv3")
-			# pool3 = max_pool(conv3, 2, 2, "max_pool3")
-			# upsample3 = max_unpool(pool3, "upsample3")	
+			pool3 = max_pool(conv3, 2, 2, "max_pool3")
+			upsample3 = max_unpool(pool3, "upsample3")	
 
-			linear = Conv_2D(conv3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
+			linear = Conv_2D(upsample3, output_chan=1, kernel=[1,1], stride=[1,1], padding="SAME", activation=tf.sigmoid, train_phase=self.train_phase, 
 							add_summary=True, name="linear_comb")
 			return linear
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
-			self.haze_in = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Haze_Image")
-			self.clear_in = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Clear_Image")
-			self.trans_in = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
+			self.haze_in = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Haze_Image")
+			self.clear_in = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Clear_Image")
+			self.trans_in = tf.placeholder(tf.float32, shape=[None,216,240,1], name="TMap")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
 			hazy_summ = tf.summary.image("Hazy_image", self.haze_in)
 			map_summ = tf.summary.image("Trans_Map", self.trans_in)
@@ -105,10 +105,10 @@ class MSCNN(object):
 			self.coarse_vars = [var for var in train_vars if "coarse" in var.name]
 			self.fine_vars = [var for var in train_vars if "fine" in var.name]
 
-			update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-  			with tf.control_dependencies(update_ops):
-				self.coarse_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.coarseLoss, var_list=self.coarse_vars)
-				self.fine_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.fineLoss, var_list=self.fine_vars)
+			# update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+  	# 		with tf.control_dependencies(update_ops):
+			self.coarse_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.coarseLoss, var_list=self.coarse_vars)
+			self.fine_solver = tf.train.AdamOptimizer(learning_rate=1e-04).minimize(self.fineLoss, var_list=self.fine_vars)
 		
 
 		self.merged_summ = tf.summary.merge_all()
@@ -149,14 +149,6 @@ class MSCNN(object):
 						print "Epoch: ", epoch, "Iteration: ", itr, " Coarse Loss: ", coarse_out[1], "Fine Loss: ", fine_out[1], \
 								"Loss: ", coarse_out[1]+fine_out[1]
 
-						# for i in range(2):
-						# 	plt.imshow(clear_in[i])
-						# 	plt.show()
-						# 	coarse_out[3][i][coarse_out[3][i]>1.0]=1.0
-						# 	coarse_out[3][i][coarse_out[3][i]<0.0]=0.0
-						# 	plt.imshow(coarse_out[3][i])
-						# 	plt.show()
-
 
 				for itr in xrange(0, val_imgs[0].shape[0]-batch_size, batch_size):
 					haze_in = val_imgs[0][itr:itr+batch_size][:,0,:,:,:]
@@ -187,7 +179,7 @@ class MSCNN(object):
 	def test(self, input_imgs, batch_size):
 		sess=tf.Session()
 		
-		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-80.meta')
+		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
 		saver.restore(sess,tf.train.latest_checkpoint(self.save_path))
 
 		graph = tf.get_default_graph()

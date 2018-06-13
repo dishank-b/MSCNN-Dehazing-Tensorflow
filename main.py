@@ -55,9 +55,8 @@ def main():
 	else:
 		predict_maps, predict_clear = nnet.test(train_img1[:,0,:,:,:], batch_size)
 		for i in range(train_img2.shape[0]):
-			clear_img = utils.clearImg(train_img1[i,0,:,:,:], predict_maps[i])
 			pair = np.hstack((train_img2[i], predict_maps[i]))
-			pair2 = np.hstack((train_img1[i,0,:,:,:],train_img1[i,1,:,:,:], clear_img, predict_clear[i]))
+			pair2 = np.hstack((train_img1[i,0,:,:,:],train_img1[i,1,:,:,:], predict_clear[i]))
 			cv2.imwrite(model_path+"/results/train/"+str(i)+"_trans.jpg", 255.0*pair)
 			cv2.imwrite(model_path+"/results/train/"+str(i)+"_clear.jpg", 255.0*pair2)
 
