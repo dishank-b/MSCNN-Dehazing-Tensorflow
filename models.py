@@ -76,9 +76,9 @@ class MSCNN(object):
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
-			self.haze_in = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Haze_Image")
-			self.clear_in = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Clear_Image")
-			self.trans_in = tf.placeholder(tf.float32, shape=[None,216,240,1], name="TMap")
+			self.haze_in = tf.placeholder(tf.float32, shape=[None,240,320,3], name="Haze_Image")
+			self.clear_in = tf.placeholder(tf.float32, shape=[None,240,320,3], name="Clear_Image")
+			self.trans_in = tf.placeholder(tf.float32, shape=[None,240,320,1], name="TMap")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
 			hazy_summ = tf.summary.image("Hazy_image", self.haze_in)
 			map_summ = tf.summary.image("Trans_Map", self.trans_in)
@@ -176,10 +176,12 @@ class MSCNN(object):
 						stack = np.hstack((i,j,k))
 						cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*stack)
 
-	def test(self, input_imgs, batch_size):
+	# def test(self, input_imgs, batch_size):
+	def test(self, batch_size):
+		print "Testing Mode"
 		sess=tf.Session()
 		
-		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
+		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-60.meta')
 		saver.restore(sess,tf.train.latest_checkpoint(self.save_path))
 
 		graph = tf.get_default_graph()
@@ -187,31 +189,38 @@ class MSCNN(object):
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
 		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
-		clr_img = graph.get_tensor_by_name("Model/clearImage/clip_by_value:0")
+		# y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
+		clr_img_clip = graph.get_tensor_by_name("Model/clearImage/clip_by_value:0")
+		clr_img = graph.get_tensor_by_name("Model/clearImage/concat_1:0") 
+		airlight = graph.get_tensor_by_name("Model/clearImage/concat:0")
 
-		
-		for itr in xrange(0, input_imgs.shape[0], batch_size):
-			if itr+batch_size<=input_imgs.shape[0]:
-				end = itr+batch_size
-			else:
-				end = input_imgs.shape[0]
-			input_img = input_imgs[itr:end]
-			out = sess.run([y, clr_img], {x:input_img, is_train:False})
-			if itr==0:
-				tot_maps = out[0]
-				tot_clr = out[1]
-			else:
-				tot_maps = np.concatenate((tot_maps, out[0]))
-				tot_clr = np.concatenate((tot_clr, out[1]))
-		print "Output Shape: ", tot_maps.shape, tot_clr.shape
-		return tot_maps, tot_clr
+		print "Tensor Loaded"
+		# for itr in xrange(0, input_imgs.shape[0], batch_size):
+		# 	if itr+batch_size<=input_imgs.shape[0]:
+		# 		end = itr+batch_size
+		# 	else:
+		# 		end = input_imgs.shape[0]
+		# 	input_img = input_imgs[itr:end]
+		# 	out = sess.run([y, clr_img], {x:input_img, is_train:False})
+		# 	if itr==0:
+		# 		tot_maps = out[0]
+		# 		tot_clr = out[1]
+		# 	else:
+		# 		tot_maps = np.concatenate((tot_maps, out[0]))
+		# 		tot_clr = np.concatenate((tot_clr, out[1]))
+		# print "Output Shape: ", tot_maps.shape, tot_clr.shape
+		# return tot_maps, tot_clr
 
-		# input_img = cv2.imread("/media/mnt/dehaze/data/resize_some.jpg")
-		# print input_img.shape
-		# in_img = input_img.reshape((1, input_img.shape[0],input_img.shape[1],input_img.shape[2]))
-		# maps = sess.run(y, {x:in_img/255.0, is_train:False})
-	
-		# cv2.imwrite("/media/mnt/dehaze/data/out.jpg", maps[0]*255.0)
-		# clear_img = utils.clearImg(input_img/255.0, maps[0])
-		# print clear_img.shape
-		# cv2.imwrite("/media/mnt/dehaze/data/clear.jpg", clear_img*255.0)
+		img_name = glob.glob("/media/mnt/dehaze/*_resize.jpg")
+		for image in img_name:
+			img = cv2.imread(image)
+			in_img = img.reshape((1, img.shape[0],img.shape[1],img.shape[2]))
+			out = sess.run([y, clr_img_clip, clr_img, airlight], {x:in_img/255.0, is_train:False})
+			# plt.imshow(out[2][0])
+			# plt.show()
+			# plt.imshow(out[3][0])
+			# plt.show()
+			# maps = sess.run(y, {x:in_img/255.0, is_train:False})
+			# clear = clearImg(img, maps[0])
+			cv2.imwrite(image[:-4]+"_map.jpg", out[0][0]*255.0)
+			cv2.imwrite(image[:-4]+"_clear.jpg", out[1][0]*255.0)
