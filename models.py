@@ -70,8 +70,8 @@ class MSCNN(object):
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
-			self.x = tf.placeholder(tf.float32, shape=[None,240,240,3], name="Haze_Image")
-			self.y = tf.placeholder(tf.float32, shape=[None,240,240,1], name="TMap")
+			self.x = tf.placeholder(tf.float32, shape=[None,216,240,3], name="Haze_Image")
+			self.y = tf.placeholder(tf.float32, shape=[None,216,240,1], name="TMap")
 			hazy_summ = tf.summary.image("Hazy image", self.x)
 			map_summ = tf.summary.image("Trans Map", self.y)
 
@@ -141,7 +141,7 @@ class MSCNN(object):
 
 					print "Epoch: ", epoch, "Iteration: ", itr, "Validation Loss: ", c_val_loss+f_val_loss
 
-				if epoch%20==0:
+				if epoch%10==0:
 					self.saver.save(self.sess, self.save_path+"MSCNN", global_step=epoch)
 					print "Checkpoint saved"
 
@@ -151,10 +151,10 @@ class MSCNN(object):
 					# print gen_imgs[0][0].shape
 					# cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*gen_imgs[0][0])
 
-	def test(self, input_imgs):
+	def test(self, input_imgs, batch_size):
 		sess=tf.Session()
 		
-		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-240.meta')
+		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-90.meta')
 		saver.restore(sess,tf.train.latest_checkpoint(self.save_path))
 
 		graph = tf.get_default_graph()
@@ -163,7 +163,18 @@ class MSCNN(object):
 		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
 		
 		print "start"
-		maps = sess.run(y, {x:input_imgs})
-		print "Done."
-		return maps
+		for itr in xrange(0, input_imgs.shape[0], batch_size):
+			if itr+batch_size<=input_imgs.shape[0]:
+				end = itr+batch_size
+			else:
+				end = input_imgs.shape[0]
+			input_img = input_imgs[itr:end]
+			maps = sess.run(y, {x:input_img})
+			if itr==0:
+				tot_out = maps
+			else:
+				tot_out = np.concatenate((tot_out, maps))
+		print "Output Shape: ", tot_out.shape
+		return tot_out
+
 
