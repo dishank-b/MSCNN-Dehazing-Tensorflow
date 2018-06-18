@@ -38,10 +38,10 @@ if not os.path.exists(model_path):
 
 
 ######### Loading Data ###########
-train_img1 = 1/255.0*np.load(data_path+"train_haze_clear.npy") # First image of each pair is hazy image and second image is clear images
-train_img2 = 1/255.0*np.load(data_path+"train_trans.npy") 
-val_img1 = 1/255.0*np.load(data_path+"val_haze_clear.npy")
-val_img2 = 1/255.0*np.load(data_path+"val_trans.npy")	   
+# train_img1 = 1/255.0*np.load(data_path+"train_haze_clear.npy") # First image of each pair is hazy image and second image is clear images
+# train_img2 = 1/255.0*np.load(data_path+"train_trans.npy") 
+# val_img1 = 1/255.0*np.load(data_path+"val_haze_clear.npy")
+# val_img2 = 1/255.0*np.load(data_path+"val_trans.npy")	   
 print "Data Loaded"
 
 nnet = MSCNN(model_path)
@@ -52,14 +52,12 @@ if mode=='train':
 	print "Model Build......"
 	nnet.train_model([train_img1, train_img2], [val_img1, val_img2], learning_rate, batch_size, epoch_size)
 else:
-	predict = nnet.test(train_img1[:,0,:,:,:], batch_size)
-	for i in range(train_img2.shape[0]):
-		clear_img = utils.clearImg(train_img1[i,0,:,:,:], predict[i])
-		pair = np.hstack((train_img2[i], predict[i]))
-		pair2 = np.hstack((train_img1[i,0,:,:,:],train_img1[i,1,:,:,:], clear_img))
-		# plt.imshow(pair[:,:,0])
-		# plt.show()
-		# plt.imshow(pair2)
-		# plt.show()
-		cv2.imwrite(model_path+"/results/train/"+str(i)+"_trans.jpg", 255.0*pair)
-		cv2.imwrite(model_path+"/results/train/"+str(i)+"_clear.jpg", 255.0*pair2)
+	print model_path
+	# predict_maps, predict_clear, predict_air = nnet.test(val_img1[:,0,:,:,:], batch_size)
+	predict_maps, predict_clear, predict_air = nnet.test(batch_size)
+	for i in range(val_img1.shape[0]):
+		pair = np.hstack((val_img2[i], predict_maps[i]))
+		pair2 = np.hstack((val_img1[i,0,:,:,:],val_img1[i,1,:,:,:], predict_clear[i]))
+		cv2.imwrite(model_path+"/results/val/"+str(i)+"_trans.jpg", 255.0*pair)
+		cv2.imwrite(model_path+"/results/val/"+str(i)+"_clear.jpg", 255.0*pair2)
+		cv2.imwrite(model_path+"/results/val/"+str(i)+"_airlight.jpg", 255.0*predict_air[i])
