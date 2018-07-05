@@ -40,7 +40,7 @@ if not os.path.exists(model_path):
 ######### Loading Data ###########
 # train_img1 = 1/255.0*np.load(data_path+"train_haze_clear.npy") # First image of each pair is hazy image and second image is clear images
 # train_img2 = 1/255.0*np.load(data_path+"train_trans.npy") 
-# val_img1 = 1/255.0*np.load(data_path+"val_haze_clear.npy")
+val_img1 = 1/255.0*np.load(data_path+"val_haze_clear.npy")
 # val_img2 = 1/255.0*np.load(data_path+"val_trans.npy")	   
 print "Data Loaded"
 
@@ -53,8 +53,8 @@ if mode=='train':
 	nnet.train_model([train_img1, train_img2], [val_img1, val_img2], learning_rate, batch_size, epoch_size)
 else:
 	print model_path
-	# predict_maps, predict_clear, predict_air = nnet.test(val_img1[:,0,:,:,:], batch_size)
-	predict_maps, predict_clear, predict_air = nnet.test(batch_size)
+	predict_maps, predict_clear, predict_air = nnet.test(val_img1[:,0,:,:,:], batch_size)
+	# predict_maps, predict_clear, predict_air = nnet.test(batch_size)
 	for i in range(val_img1.shape[0]):
 		pair = np.hstack((val_img2[i], predict_maps[i]))
 		pair2 = np.hstack((val_img1[i,0,:,:,:],val_img1[i,1,:,:,:], predict_clear[i]))

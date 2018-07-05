@@ -2,7 +2,7 @@ model_params:
   descrip: "Using Deconv Layers for upsampling, all kernel 5X5. No batch norm. Indoor"
   model_name: "MSCNN" # DD or MSCNN
   mode: "test"   # train or test
-  log_dir: /media/mnt/dehaze/logs/ # path to write the model and load the model
+  log_dir: /media/mnt/dehaze/mscnn_logs/ # path to write the model and load the model
 
 training_params:
   learning_rate: 1e-04

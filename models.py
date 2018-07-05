@@ -8,6 +8,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from utils import *
+import time
 
 class MSCNN(object):
 	"""Single Image Dehazing via Multi-Scale Convolutional Neural Networks"""
@@ -182,23 +183,41 @@ class MSCNN(object):
 						stack = np.hstack((i,j,k))
 						cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*stack)
 
-	# def test(self, input_imgs, batch_size):
-	def test(self, batch_size):
-		sess=tf.Session()
+	
+	def single_img_pass(self, input_imgs, x, y, is_train):
+		out_images = []
+		count = 0
+		start_time = time.time()
+		for i in range(len(input_imgs)):
+			clear = self.sess.run(y, {x:input_imgs[i:i+1], is_train:False})
+			# cv2.imwrite(self.output_path+str(i)+'.jpg', clear[0]*255.0)
+			count+=1
+			if count==50:
+				count=0
+				print (time.time()-start_time)/50.0
+				start_time = time.time()
+			out_images.append((clear[0]+1)/2)
+		return np.array(out_images)
+
+
+
+	# def test(self, batch_size):
+	def test(self, input_imgs, batch_size):
+		self.sess=tf.Session()
 		
 		saver = tf.train.import_meta_graph(self.save_path+'MSCNN-90.meta')
 		print self.save_path
-		saver.restore(sess,tf.train.latest_checkpoint(self.save_path))
+		saver.restore(self.sess,self.save_path+'MSCNN-90')
 		print self.save_path
 		graph = tf.get_default_graph()
 
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
-		y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
+		# y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Sigmoid:0")
 		# y = graph.get_tensor_by_name("Model/fineNet/linear_comb/Relu:0")
 		clr_img_clip = graph.get_tensor_by_name("Model/clearImage/clip_by_value:0")
-		clr_img = graph.get_tensor_by_name("Model/clearImage/concat_1:0") 
-		airlight = graph.get_tensor_by_name("Model/clearImage/concat:0")
+		# clr_img = graph.get_tensor_by_name("Model/clearImage/concat_1:0") 
+		# airlight = graph.get_tensor_by_name("Model/clearImage/concat:0")
 		
 		# print "Tensor Loaded"
 		# for itr in xrange(0, input_imgs.shape[0], batch_size):
@@ -218,17 +237,18 @@ class MSCNN(object):
 		# 		tot_air = np.concatenate((tot_airn, out[2]))
 		# print "Output Shape: ", tot_maps.shape, tot_clr.shape, tot_air.shape
 		# return tot_maps, tot_clr, tot_air
+		self.single_img_pass(input_imgs, x, clr_img_clip, is_train)
 
-		img_name = glob.glob("/media/mnt/dehaze/*_resize.jpg")
-		for image in img_name:
-			img = cv2.imread(image)
-			in_img = img.reshape((1, img.shape[0],img.shape[1],img.shape[2]))
-			out = sess.run([y, clr_img_clip, clr_img, airlight], {x:in_img/255.0, is_train:False})
-			# plt.imshow(out[2][0])
-			# plt.show()
-			# plt.imshow(out[3][0])
-			# plt.show()
-			# maps = sess.run(y, {x:in_img/255.0, is_train:False})
-			# clear = clearImg(img, maps[0])
-			cv2.imwrite(image[:-4]+"_map.jpg", out[0][0]*255.0)
-			cv2.imwrite(image[:-4]+"_clear.jpg", out[1][0]*255.0)
+		# img_name = glob.glob("/media/mnt/dehaze/*_resize.jpg")
+		# for image in img_name:
+		# 	img = cv2.imread(image)
+		# 	in_img = img.reshape((1, img.shape[0],img.shape[1],img.shape[2]))
+		# 	out = sess.run([y, clr_img_clip, clr_img, airlight], {x:in_img/255.0, is_train:False})
+		# 	# plt.imshow(out[2][0])
+		# 	# plt.show()
+		# 	# plt.imshow(out[3][0])
+		# 	# plt.show()
+		# 	# maps = sess.run(y, {x:in_img/255.0, is_train:False})
+		# 	# clear = clearImg(img, maps[0])
+		# 	cv2.imwrite(image[:-4]+"_map.jpg", out[0][0]*255.0)
+		# 	cv2.imwrite(image[:-4]+"_clear.jpg", out[1][0]*255.0)
